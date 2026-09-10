@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/watchlist_header.dart';
-import '../widgets/empty_watchlist.dart';
-import '../widgets/watchlist_item.dart';
+import '../widgets/watchlist/watchlist_header.dart';
+import '../widgets/watchlist/empty_watchlist.dart';
+import '../widgets/watchlist/watchlist_item.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/sort_bottom_sheet.dart';
+import '../widgets/watchlist/sort_bottom_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -14,7 +14,7 @@ class WatchlistScreen extends StatefulWidget {
 }
 
 class _WatchlistScreenState extends State<WatchlistScreen> {
-  bool isEmpty = false;
+  bool isEmpty = true;
 
   String sortType = '가나다순';
 
