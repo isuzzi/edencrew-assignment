@@ -70,9 +70,28 @@ class StockStore extends ChangeNotifier {
   }
 
   /// 관심 종목 새로고침
-  // TODO: 실시간 시세 API 연결 후 구현
+  /// 관심 종목 새로고침
   Future<void> refreshFavorites() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    final favorites = favoriteStocks;
+
+    if (favorites.isEmpty) {
+      return;
+    }
+
+    for (final stock in favorites) {
+      try {
+        final priceResult = await _apiService.getStockPrice(stock.symbol);
+
+        stock.price = priceResult.price;
+        stock.change = priceResult.change;
+        stock.changeRate = priceResult.changeRate;
+      } catch (e) {
+        debugPrint(
+          '관심 종목 시세 조회 실패 '
+          '${stock.name}(${stock.symbol}): $e',
+        );
+      }
+    }
 
     notifyListeners();
   }

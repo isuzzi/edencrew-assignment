@@ -2,9 +2,9 @@ class Stock {
   final String name;
   final String symbol;
   final String market;
-  final String price;
-  final String change;
-  final String changeRate;
+  String price;
+  String change;
+  String changeRate;
 
   bool isFavorite;
 

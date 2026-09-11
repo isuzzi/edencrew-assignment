@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/foundation.dart';
 import '../models/stock.dart';
 import '../models/stock_store.dart';
 import '../widgets/stock/stock_list_tile.dart';
@@ -110,13 +110,23 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         bottom: false,
         child: Column(
           children: [
-            WatchlistHeader(sortType: _sortType, onSortTap: _showSortSheet),
+            WatchlistHeader(
+              sortType: _sortType,
+              onSortTap: _showSortSheet,
+              onRefreshTap: () async {
+                debugPrint('관심 목록 새로고침 시작');
 
+                await widget.store.refreshFavorites();
+
+                debugPrint('관심 목록 새로고침 완료');
+              },
+            ),
             Expanded(
               child: stocks.isEmpty
                   ? const EmptyWatchlist()
                   : RefreshIndicator(
                       onRefresh: () async {
+                        debugPrint('관심 목록 새로고침 시작');
                         await widget.store.refreshFavorites();
                       },
                       child: ListView.builder(
