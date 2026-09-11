@@ -117,7 +117,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                   ? const EmptyWatchlist()
                   : RefreshIndicator(
                       onRefresh: () async {
-                        setState(() {});
+                        await widget.store.refreshFavorites();
                       },
                       child: ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),

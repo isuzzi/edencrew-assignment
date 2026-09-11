@@ -53,6 +53,13 @@ class StockStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  //TODO: API 연결시 새로고침 구현
+  Future<void> refreshFavorites() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    notifyListeners();
+  }
+
   List<Stock> search(String query) {
     final normalizedQuery = query.trim().toLowerCase();
 
