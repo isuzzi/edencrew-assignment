@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 class WatchlistHeader extends StatelessWidget {
   final String sortType;
@@ -31,15 +32,29 @@ class WatchlistHeader extends StatelessWidget {
                 children: [
                   Text(
                     sortType,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: context.colors.textSecondary,
+                    ),
                   ),
+                  const SizedBox(width: 4),
 
-                  // 정렬 아이콘 자리
-                  const SizedBox(width: 20),
-
-                  // 새로고침 아이콘 자리
-                  const SizedBox(width: 28),
+                  Icon(
+                    Icons.arrow_downward,
+                    size: 18,
+                    color: context.colors.textSecondary,
+                  ),
                 ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            GestureDetector(
+              child: Icon(
+                Icons.refresh,
+                size: 20,
+                color: context.colors.textSecondary,
               ),
             ),
           ],

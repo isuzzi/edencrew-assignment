@@ -10,13 +10,13 @@ class EmptyWatchlist extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset('assets/ico_star_empty_40.png', width: 40, height: 40),
+          Icon(Icons.star_border, size: 40, color: context.colors.textTertiary),
 
           const SizedBox(height: 16),
 
           const Text(
             '관심 종목이 없습니다',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 8),

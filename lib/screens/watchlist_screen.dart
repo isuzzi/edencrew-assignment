@@ -14,7 +14,7 @@ class WatchlistScreen extends StatefulWidget {
 }
 
 class _WatchlistScreenState extends State<WatchlistScreen> {
-  bool isEmpty = true;
+  bool isEmpty = false;
 
   String sortType = '가나다순';
 

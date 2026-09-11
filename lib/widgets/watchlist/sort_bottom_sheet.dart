@@ -24,7 +24,11 @@ class SortBottomSheet extends StatelessWidget {
         children: [
           const Text(
             '정렬',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
 
           const SizedBox(height: 28),
@@ -82,8 +86,8 @@ class _SortItem extends StatelessWidget {
 
             const Spacer(),
 
-            // 체크 아이콘 자리
-            if (selected) const SizedBox(width: 24, height: 24),
+            if (selected)
+              const Icon(Icons.check, size: 24, color: Colors.white),
           ],
         ),
       ),

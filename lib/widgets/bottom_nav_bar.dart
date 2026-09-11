@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 class BottomNavBar extends StatelessWidget {
   const BottomNavBar({super.key});
@@ -7,15 +8,15 @@ class BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 96,
-      decoration: const BoxDecoration(
-        color: Color(0xFF171716),
-        border: Border(top: BorderSide(color: Color(0xFF282827))),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceRaised,
+        border: Border(top: BorderSide(color: context.colors.surfaceRaised)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavItem(label: '관심', isSelected: true),
-          _NavItem(label: '검색', isSelected: false),
+          _NavItem(label: '관심', icon: Icons.star, isSelected: true),
+          _NavItem(label: '검색', icon: Icons.search, isSelected: false),
         ],
       ),
     );
@@ -24,29 +25,29 @@ class BottomNavBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   final String label;
+  final IconData icon;
   final bool isSelected;
 
-  const _NavItem({required this.label, required this.isSelected});
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final color = isSelected
+        ? context.colors.navActive
+        : context.colors.navInactive;
+
     return SizedBox(
       width: 60,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // 네비게이션 아이콘 자리
-          const SizedBox(width: 24, height: 24),
-
+          Icon(icon, size: 24, color: color),
           const SizedBox(height: 4),
-
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isSelected ? Colors.white : Colors.grey,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 11, color: color)),
         ],
       ),
     );
