@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'stock.dart';
 import 'naver_search_result.dart';
@@ -7,8 +10,12 @@ import '../services/naver_api_service.dart';
 class StockStore extends ChangeNotifier {
   final NaverApiService _apiService;
 
+  static const String _favoritesKey = 'favorite_stocks';
+
   StockStore({NaverApiService? apiService})
-    : _apiService = apiService ?? NaverApiService();
+    : _apiService = apiService ?? NaverApiService() {
+    _initialize();
+  }
 
   final List<Stock> stocks = [
     Stock(
@@ -56,6 +63,16 @@ class StockStore extends ChangeNotifier {
   List<Stock> get favoriteStocks =>
       stocks.where((stock) => stock.isFavorite).toList();
 
+  /// 앱 시작 시 로컬 관심 종목을 불러온다.
+  Future<void> _initialize() async {
+    await _loadFavorites();
+
+    // 로컬에서 복원한 관심 종목의 최신 시세를 가져온다.
+    await _refreshFavorites();
+
+    notifyListeners();
+  }
+
   /// 관심 종목 추가 / 삭제
   void toggleFavorite(Stock stock) {
     // 검색 결과로 새롭게 생성된 Stock이라면
@@ -66,12 +83,84 @@ class StockStore extends ChangeNotifier {
 
     stock.isFavorite = !stock.isFavorite;
 
+    // 관심 목록이 변경될 때마다 로컬에 저장한다.
+    _saveFavorites();
+
     notifyListeners();
   }
 
-  /// 관심 종목 새로고침
+  /// 관심 종목을 로컬에 저장한다.
+  Future<void> _saveFavorites() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      final favoriteData = favoriteStocks
+          .map((stock) => stock.toJson())
+          .toList();
+
+      await preferences.setString(_favoritesKey, jsonEncode(favoriteData));
+
+      debugPrint('관심 종목 저장 완료: ${favoriteStocks.length}개');
+    } catch (e) {
+      debugPrint('관심 종목 저장 실패: $e');
+    }
+  }
+
+  /// 로컬에 저장된 관심 종목을 불러온다.
+  Future<void> _loadFavorites() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+
+      final savedData = preferences.getString(_favoritesKey);
+
+      if (savedData == null || savedData.isEmpty) {
+        debugPrint('저장된 관심 종목이 없습니다.');
+        return;
+      }
+
+      final List<dynamic> decodedData = jsonDecode(savedData);
+
+      for (final item in decodedData) {
+        final savedStock = Stock.fromJson(Map<String, dynamic>.from(item));
+
+        // 기본 stocks에 이미 존재하는 종목이라면
+        // 기존 Stock 객체를 사용한다.
+        Stock? existingStock;
+
+        for (final stock in stocks) {
+          if (stock.symbol == savedStock.symbol) {
+            existingStock = stock;
+            break;
+          }
+        }
+
+        if (existingStock != null) {
+          existingStock.isFavorite = true;
+        } else {
+          // 검색을 통해 새롭게 추가했던 종목이라면
+          // 로컬 데이터로 Stock을 새로 생성한다.
+          savedStock.isFavorite = true;
+          stocks.add(savedStock);
+        }
+      }
+
+      debugPrint('관심 종목 복원 완료: ${favoriteStocks.length}개');
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('관심 종목 복원 실패: $e');
+    }
+  }
+
   /// 관심 종목 새로고침
   Future<void> refreshFavorites() async {
+    await _refreshFavorites();
+
+    notifyListeners();
+  }
+
+  /// 실제 관심 종목 시세 업데이트
+  Future<void> _refreshFavorites() async {
     final favorites = favoriteStocks;
 
     if (favorites.isEmpty) {
@@ -85,6 +174,13 @@ class StockStore extends ChangeNotifier {
         stock.price = priceResult.price;
         stock.change = priceResult.change;
         stock.changeRate = priceResult.changeRate;
+
+        debugPrint(
+          '시세 업데이트: '
+          '${stock.name}(${stock.symbol}) '
+          '${stock.price} '
+          '${stock.changeRate}',
+        );
       } catch (e) {
         debugPrint(
           '관심 종목 시세 조회 실패 '
@@ -92,8 +188,6 @@ class StockStore extends ChangeNotifier {
         );
       }
     }
-
-    notifyListeners();
   }
 
   /// 종목 검색
@@ -106,7 +200,7 @@ class StockStore extends ChangeNotifier {
 
     final results = await _apiService.searchStocks(normalizedQuery);
 
-    final stocks = <Stock>[];
+    final searchStocks = <Stock>[];
 
     for (final result in results) {
       final stock = _toStock(result);
@@ -124,10 +218,10 @@ class StockStore extends ChangeNotifier {
         );
       }
 
-      stocks.add(stock);
+      searchStocks.add(stock);
     }
 
-    return stocks;
+    return searchStocks;
   }
 
   /// API 검색 결과를 앱의 Stock 모델로 변환
