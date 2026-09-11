@@ -4,11 +4,12 @@ import '../../theme/theme.dart';
 class StockPeriodSelector extends StatelessWidget {
   final String selectedPeriod;
   final ValueChanged<String> onChanged;
-
+  final VoidCallback? onFavoriteTap;
   const StockPeriodSelector({
     super.key,
     required this.selectedPeriod,
     required this.onChanged,
+    this.onFavoriteTap,
   });
 
   static const periods = ['1개월', '3개월', '6개월', '1년'];

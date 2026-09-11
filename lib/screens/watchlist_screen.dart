@@ -1,74 +1,100 @@
 import 'package:flutter/material.dart';
 
+import '../models/stock.dart';
+import '../models/stock_store.dart';
+import '../widgets/stock/stock_list_tile.dart';
 import '../widgets/watchlist/watchlist_header.dart';
 import '../widgets/watchlist/empty_watchlist.dart';
-import '../widgets/watchlist/watchlist_item.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../widgets/watchlist/sort_bottom_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
-  const WatchlistScreen({super.key});
+  final StockStore store;
+
+  const WatchlistScreen({super.key, required this.store});
 
   @override
   State<WatchlistScreen> createState() => _WatchlistScreenState();
 }
 
 class _WatchlistScreenState extends State<WatchlistScreen> {
-  bool isEmpty = false;
+  String _sortType = '현재가순';
 
-  String sortType = '가나다순';
+  @override
+  void initState() {
+    super.initState();
 
-  final stocks = const [
-    {
-      'name': '삼성전자',
-      'code': '005930',
-      'market': '코스피',
-      'price': '179,700',
-      'change': '-400 (-0.22%)',
-    },
-    {
-      'name': 'SK하이닉스',
-      'code': '000660',
-      'market': '코스피',
-      'price': '412,500',
-      'change': '+9,500 (+2.36%)',
-    },
-    {
-      'name': '카카오',
-      'code': '035720',
-      'market': '코스피',
-      'price': '61,300',
-      'change': '-800 (-1.29%)',
-    },
-    {
-      'name': '에코프로비엠',
-      'code': '247540',
-      'market': '코스닥',
-      'price': '195,400',
-      'change': '0 (0.00%)',
-    },
-    {
-      'name': 'LG에너지솔루션',
-      'code': '373220',
-      'market': '코스피',
-      'price': '',
-      'change': '',
-    },
-  ];
+    widget.store.addListener(_onStoreChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  List<Stock> _getSortedStocks() {
+    final stocks = List<Stock>.from(widget.store.favoriteStocks);
+
+    switch (_sortType) {
+      case '현재가순':
+        stocks.sort((a, b) {
+          final priceA = _parsePrice(a.price);
+          final priceB = _parsePrice(b.price);
+
+          return priceB.compareTo(priceA);
+        });
+        break;
+
+      case '등락률순':
+        stocks.sort((a, b) {
+          final rateA = _parseChangeRate(a.changeRate);
+          final rateB = _parseChangeRate(b.changeRate);
+
+          return rateB.compareTo(rateA);
+        });
+        break;
+
+      case '가나다순':
+        stocks.sort((a, b) {
+          return a.name.compareTo(b.name);
+        });
+        break;
+    }
+
+    return stocks;
+  }
+
+  double _parsePrice(String price) {
+    final value = price.replaceAll(',', '').replaceAll('원', '').trim();
+
+    return double.tryParse(value) ?? 0;
+  }
+
+  double _parseChangeRate(String changeRate) {
+    final value = changeRate.replaceAll('%', '').replaceAll('+', '').trim();
+
+    return double.tryParse(value) ?? 0;
+  }
 
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (sheetContext) {
         return SortBottomSheet(
-          selectedSort: sortType,
+          selectedSort: _sortType,
           onSelected: (value) {
             setState(() {
-              sortType = value;
+              _sortType = value;
             });
 
-            Navigator.pop(context);
+            Navigator.pop(sheetContext);
           },
         );
       },
@@ -77,33 +103,38 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final stocks = _getSortedStocks();
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            WatchlistHeader(sortType: sortType, onSortTap: _showSortSheet),
+            WatchlistHeader(sortType: _sortType, onSortTap: _showSortSheet),
 
             Expanded(
-              child: isEmpty
+              child: stocks.isEmpty
                   ? const EmptyWatchlist()
-                  : ListView.builder(
-                      itemCount: stocks.length,
-                      itemBuilder: (context, index) {
-                        final stock = stocks[index];
-
-                        return WatchlistItem(
-                          name: stock['name']!,
-                          code: stock['code']!,
-                          market: stock['market']!,
-                          price: stock['price']!,
-                          change: stock['change']!,
-                        );
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        await widget.store.refreshFavorites();
                       },
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        itemCount: stocks.length,
+                        itemBuilder: (context, index) {
+                          final stock = stocks[index];
+
+                          return StockListTile(
+                            stock: stock,
+                            onFavoriteTap: () {
+                              widget.store.toggleFavorite(stock);
+                            },
+                          );
+                        },
+                      ),
                     ),
             ),
-
-            const BottomNavBar(),
           ],
         ),
       ),
