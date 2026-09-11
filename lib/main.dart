@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'theme/theme.dart';
-import 'screens/watchlist_screen.dart';
+import 'screens/stock_detail.screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const WatchlistScreen(),
+      home: const StockDetailScreen(),
     );
   }
 }
