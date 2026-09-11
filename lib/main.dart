@@ -1,3 +1,4 @@
+import 'package:edencrew_assignment_starter/screens/search_screen.dart';
 import 'package:flutter/material.dart';
 import 'theme/theme.dart';
 import 'screens/stock_detail.screen.dart';
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const StockDetailScreen(),
+      home: const SearchScreen(),
     );
   }
 }
