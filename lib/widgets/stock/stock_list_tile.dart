@@ -1,38 +1,29 @@
 import 'package:flutter/material.dart';
 
-class StockListTile extends StatelessWidget {
-  final String stockName;
-  final String symbol;
-  final String market;
-  final String price;
-  final String change;
-  final String changeRate;
+import '../../models/stock.dart';
+import '../../theme/theme.dart';
 
-  /// 검색어
+class StockListTile extends StatelessWidget {
+  final Stock stock;
+
+  /// 검색 화면에서만 사용
   final String searchQuery;
 
-  /// 가격 정보를 불러오는 중인지 여부
-  final bool isLoading;
-
   final VoidCallback? onTap;
+  final VoidCallback? onFavoriteTap;
 
   const StockListTile({
     super.key,
-    required this.stockName,
-    required this.symbol,
-    required this.market,
-    required this.price,
-    required this.change,
-    required this.changeRate,
+    required this.stock,
     this.searchQuery = '',
-    this.isLoading = false,
     this.onTap,
+    this.onFavoriteTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final changeValue = double.tryParse(
-      change.replaceAll(',', '').replaceAll('+', ''),
+      stock.change.replaceAll(',', '').replaceAll('+', ''),
     );
 
     final isUp = (changeValue ?? 0) > 0;
@@ -62,12 +53,12 @@ class StockListTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStockName(),
+                  _buildStockName(context),
                   const SizedBox(height: 3),
                   Text(
-                    '$symbol · $market',
-                    style: const TextStyle(
-                      color: Color(0xFF777777),
+                    '${stock.symbol} · ${stock.market}',
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
                     ),
@@ -77,142 +68,123 @@ class StockListTile extends StatelessWidget {
             ),
 
             // 가격 정보
-            if (isLoading)
-              const SizedBox(
-                width: 64,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    _LoadingBox(width: 64, height: 15),
-                    SizedBox(height: 3),
-                    _LoadingBox(width: 48, height: 13),
-                  ],
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  stock.price,
+                  style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              )
-            else
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    price,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                const SizedBox(height: 3),
+                Text(
+                  '${stock.change} (${stock.changeRate})',
+                  style: TextStyle(
+                    color: changeColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '$change ($changeRate)',
-                    style: TextStyle(
-                      color: changeColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+
+            const SizedBox(width: 12),
+
+            // 관심 종목 버튼
+            GestureDetector(
+              onTap: onFavoriteTap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  stock.isFavorite ? Icons.star : Icons.star_border,
+                  size: 22,
+                  color: stock.isFavorite
+                      ? context.colors.favoriteActive
+                      : context.colors.favoriteInactive,
+                ),
               ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// 검색어와 일치하는 부분만 보라색으로 표시
-  Widget _buildStockName() {
-    // 검색어가 없으면 기존처럼 전체를 흰색으로 표시
+  /// 검색어와 일치하는 부분을 강조합니다.
+  Widget _buildStockName(BuildContext context) {
     if (searchQuery.isEmpty) {
       return Text(
-        stockName,
+        stock.name,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: context.colors.textPrimary,
           fontSize: 15,
           fontWeight: FontWeight.w500,
         ),
       );
     }
 
-    final lowerStockName = stockName.toLowerCase();
-    final lowerQuery = searchQuery.toLowerCase();
+    final spans = <TextSpan>[];
 
-    final matchIndex = lowerStockName.indexOf(lowerQuery);
+    final query = searchQuery.toLowerCase();
+    final name = stock.name.toLowerCase();
 
-    // 검색어가 종목명에 없으면 전체를 흰색으로 표시
-    if (matchIndex == -1) {
-      return Text(
-        stockName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
+    int currentIndex = 0;
+
+    while (true) {
+      final matchIndex = name.indexOf(query, currentIndex);
+
+      if (matchIndex == -1) {
+        if (currentIndex < stock.name.length) {
+          spans.add(
+            TextSpan(
+              text: stock.name.substring(currentIndex),
+              style: TextStyle(color: context.colors.textPrimary),
+            ),
+          );
+        }
+        break;
+      }
+
+      if (matchIndex > currentIndex) {
+        spans.add(
+          TextSpan(
+            text: stock.name.substring(currentIndex, matchIndex),
+            style: TextStyle(color: context.colors.textPrimary),
+          ),
+        );
+      }
+
+      spans.add(
+        TextSpan(
+          text: stock.name.substring(
+            matchIndex,
+            matchIndex + searchQuery.length,
+          ),
+          style: TextStyle(
+            color: context.colors.searchHighlight,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       );
-    }
 
-    final matchEnd = matchIndex + searchQuery.length;
+      currentIndex = matchIndex + searchQuery.length;
+    }
 
     return Text.rich(
-      TextSpan(
-        children: [
-          // 검색어 앞부분
-          if (matchIndex > 0)
-            TextSpan(
-              text: stockName.substring(0, matchIndex),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-
-          // 검색어와 일치하는 부분
-          TextSpan(
-            text: stockName.substring(matchIndex, matchEnd),
-            style: const TextStyle(
-              color: Color(0xFF8B5CF6),
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-
-          // 검색어 뒷부분
-          if (matchEnd < stockName.length)
-            TextSpan(
-              text: stockName.substring(matchEnd),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-        ],
-      ),
+      TextSpan(children: spans),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-    );
-  }
-}
-
-class _LoadingBox extends StatelessWidget {
-  final double width;
-  final double height;
-
-  const _LoadingBox({required this.width, required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0xFF282827),
-        borderRadius: BorderRadius.circular(4),
+      style: TextStyle(
+        color: context.colors.textPrimary,
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
       ),
     );
   }
