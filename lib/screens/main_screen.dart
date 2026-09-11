@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/stock_store.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'watchlist_screen.dart';
 import 'search_screen.dart';
@@ -14,7 +15,19 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [WatchlistScreen(), SearchScreen()];
+  final StockStore _stockStore = StockStore();
+
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _screens = [
+      WatchlistScreen(store: _stockStore),
+      SearchScreen(store: _stockStore),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+
+import '../../models/stock.dart';
 import '../../theme/theme.dart';
-import 'search_stock_list_tile.dart';
+import '../stock/stock_list_tile.dart';
 
 class SearchResultList extends StatelessWidget {
-  final List<SearchStock> stocks;
+  final List<Stock> stocks;
   final String searchQuery;
+  final void Function(Stock stock)? onFavoriteTap;
 
   const SearchResultList({
     super.key,
     required this.stocks,
     required this.searchQuery,
+    this.onFavoriteTap,
   });
 
   @override
@@ -22,25 +26,14 @@ class SearchResultList extends StatelessWidget {
       itemBuilder: (context, index) {
         final stock = stocks[index];
 
-        return SearchStockListTile(
-          stockName: stock.name,
-          symbol: stock.symbol,
-          market: stock.market,
+        return StockListTile(
+          stock: stock,
           searchQuery: searchQuery,
+          onFavoriteTap: () {
+            onFavoriteTap?.call(stock);
+          },
         );
       },
     );
   }
-}
-
-class SearchStock {
-  final String name;
-  final String symbol;
-  final String market;
-
-  const SearchStock({
-    required this.name,
-    required this.symbol,
-    required this.market,
-  });
 }
