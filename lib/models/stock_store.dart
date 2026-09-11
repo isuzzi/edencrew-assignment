@@ -106,7 +106,28 @@ class StockStore extends ChangeNotifier {
 
     final results = await _apiService.searchStocks(normalizedQuery);
 
-    return results.map(_toStock).toList();
+    final stocks = <Stock>[];
+
+    for (final result in results) {
+      final stock = _toStock(result);
+
+      try {
+        final priceResult = await _apiService.getStockPrice(stock.symbol);
+
+        stock.price = priceResult.price;
+        stock.change = priceResult.change;
+        stock.changeRate = priceResult.changeRate;
+      } catch (e) {
+        debugPrint(
+          '검색 종목 시세 조회 실패 '
+          '${stock.name}(${stock.symbol}): $e',
+        );
+      }
+
+      stocks.add(stock);
+    }
+
+    return stocks;
   }
 
   /// API 검색 결과를 앱의 Stock 모델로 변환
