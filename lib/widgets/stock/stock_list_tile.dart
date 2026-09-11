@@ -39,9 +39,9 @@ class StockListTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: 59,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Color(0xFF242424), width: 1),
+            bottom: BorderSide(color: context.colors.borderStrong, width: 1),
           ),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),

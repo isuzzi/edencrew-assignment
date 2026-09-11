@@ -52,4 +52,17 @@ class StockStore extends ChangeNotifier {
     stock.isFavorite = !stock.isFavorite;
     notifyListeners();
   }
+
+  List<Stock> search(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+
+    if (normalizedQuery.isEmpty) {
+      return [];
+    }
+
+    return stocks.where((stock) {
+      return stock.name.toLowerCase().contains(normalizedQuery) ||
+          stock.symbol.toLowerCase().contains(normalizedQuery);
+    }).toList();
+  }
 }
