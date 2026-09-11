@@ -36,7 +36,7 @@ class StockListTile extends StatelessWidget {
         : const Color(0xFF888888);
 
     return InkWell(
-      onTap: onTap,
+      onTap: onTap, 
       child: Container(
         height: 59,
         decoration: BoxDecoration(
