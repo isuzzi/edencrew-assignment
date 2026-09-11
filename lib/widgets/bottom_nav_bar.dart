@@ -1,19 +1,55 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
-class WatchlistBottomNavigation extends StatelessWidget {
-  const WatchlistBottomNavigation({super.key});
+class BottomNavBar extends StatelessWidget {
+  const BottomNavBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: 0,
-      onTap: (index) {
-        // TODO: 검색 화면 연결
-      },
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.star), label: '관심'),
-        BottomNavigationBarItem(icon: Icon(Icons.search), label: '검색'),
-      ],
+    return Container(
+      height: 96,
+      decoration: BoxDecoration(
+        color: context.colors.surfaceRaised,
+        border: Border(top: BorderSide(color: context.colors.surfaceRaised)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _NavItem(label: '관심', icon: Icons.star, isSelected: true),
+          _NavItem(label: '검색', icon: Icons.search, isSelected: false),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+
+  const _NavItem({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected
+        ? context.colors.navActive
+        : context.colors.navInactive;
+
+    return SizedBox(
+      width: 60,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24, color: color),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(fontSize: 11, color: color)),
+        ],
+      ),
     );
   }
 }
