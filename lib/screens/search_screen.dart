@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../widgets/search/search_field.dart';
 import '../widgets/search/search_initial_state.dart';
 import '../widgets/search/search_empty_state.dart';
 import '../widgets/search/search_result_list.dart';
-import '../widgets/bottom_nav_bar.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -75,9 +75,6 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         ),
       ),
-
-      // Bottom Navigation Bar
-      bottomNavigationBar: const BottomNavBar(),
     );
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../widgets/watchlist/watchlist_header.dart';
 import '../widgets/watchlist/empty_watchlist.dart';
 import '../widgets/watchlist/watchlist_item.dart';
-import '../widgets/bottom_nav_bar.dart';
 import '../widgets/watchlist/sort_bottom_sheet.dart';
 
 class WatchlistScreen extends StatefulWidget {
@@ -83,7 +82,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         child: Column(
           children: [
             WatchlistHeader(sortType: sortType, onSortTap: _showSortSheet),
-
             Expanded(
               child: isEmpty
                   ? const EmptyWatchlist()
@@ -102,8 +100,6 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                       },
                     ),
             ),
-
-            const BottomNavBar(),
           ],
         ),
       ),
