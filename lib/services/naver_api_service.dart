@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:charset/charset.dart';
 
 import '../models/naver_search_result.dart';
 
@@ -35,12 +36,14 @@ class NaverApiService {
       throw Exception('Naver 검색 API 요청 실패: ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    final decoded = jsonDecode(eucKr.decode(response.bodyBytes));
 
     return _parseSearchResults(decoded);
   }
 
-  /// 종목 현재 시세 조회
+  static const String _realtimeApiBaseUrl =
+      'https://polling.finance.naver.com/api/realtime';
+
   Future<StockPriceResult> getStockPrice(String symbol) async {
     final normalizedSymbol = symbol.trim();
 
@@ -48,24 +51,75 @@ class NaverApiService {
       throw ArgumentError('잘못된 종목 코드입니다: $symbol');
     }
 
-    final uri = Uri.parse('$_stockApiBaseUrl/$normalizedSymbol/basic');
+    final uri = Uri.parse(
+      _realtimeApiBaseUrl,
+    ).replace(queryParameters: {'query': 'SERVICE_ITEM:$normalizedSymbol'});
 
     final response = await _client.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Naver 시세 API 요청 실패 '
+        'Naver 실시간 시세 API 요청 실패 '
         '($normalizedSymbol): ${response.statusCode}',
       );
     }
 
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    /*
+   * NAVER 실시간 시세 API는
+   * Content-Type: text/plain;charset=EUC-KR
+   * 로 응답한다.
+   *
+   * package:http의 response.body는 UTF-8 기준으로 처리될 수 있으므로
+   * bodyBytes를 EUC-KR로 직접 디코딩한다.
+   */
+    final decoded = jsonDecode(eucKr.decode(response.bodyBytes));
 
     if (decoded is! Map<String, dynamic>) {
-      throw Exception('Naver 시세 API 응답 형식이 올바르지 않습니다.');
+      throw Exception('Naver 실시간 시세 API 응답 형식이 올바르지 않습니다.');
     }
 
-    return StockPriceResult.fromJson(decoded);
+    /*
+   * 실제 NAVER 응답 구조:
+   *
+   * {
+   *   "resultCode": "success",
+   *   "result": {
+   *     "pollingInterval": 70000,
+   *     "areas": [...]
+   *   }
+   * }
+   */
+    final result = decoded['result'];
+
+    if (result is! Map<String, dynamic>) {
+      throw Exception('Naver 실시간 시세 result 데이터가 없습니다.');
+    }
+
+    final areas = result['areas'];
+
+    if (areas is! List || areas.isEmpty) {
+      throw Exception('Naver 실시간 시세 영역 데이터가 없습니다.');
+    }
+
+    final firstArea = areas.first;
+
+    if (firstArea is! Map<String, dynamic>) {
+      throw Exception('Naver 실시간 시세 영역 형식이 올바르지 않습니다.');
+    }
+
+    final datas = firstArea['datas'];
+
+    if (datas is! List || datas.isEmpty) {
+      throw Exception('Naver 실시간 시세 종목 데이터가 없습니다.');
+    }
+
+    final data = datas.first;
+
+    if (data is! Map<String, dynamic>) {
+      throw Exception('Naver 실시간 시세 종목 데이터 형식이 올바르지 않습니다.');
+    }
+
+    return StockPriceResult.fromJson(data);
   }
 
   /// 종목 메타데이터 조회
@@ -82,15 +136,15 @@ class NaverApiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Naver 종목 메타데이터 API 요청 실패 '
+        'Naver 실시간 시세 API 요청 실패 '
         '($normalizedSymbol): ${response.statusCode}',
       );
     }
 
-    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    final decoded = jsonDecode(response.body);
 
     if (decoded is! Map<String, dynamic>) {
-      throw Exception('Naver 종목 메타데이터 API 응답 형식이 올바르지 않습니다.');
+      throw Exception('Naver 실시간 시세 API 응답 형식이 올바르지 않습니다.');
     }
 
     return StockMetadataResult.fromJson(decoded);
@@ -144,42 +198,144 @@ class StockPriceResult {
   final String change;
   final String changeRate;
 
+  final String openPrice;
+  final String highPrice;
+  final String lowPrice;
+  final String tradingVolume;
+  final String marketCap;
+
   const StockPriceResult({
     required this.price,
     required this.change,
     required this.changeRate,
+    this.openPrice = '',
+    this.highPrice = '',
+    this.lowPrice = '',
+    this.tradingVolume = '',
+    this.marketCap = '',
   });
 
   factory StockPriceResult.fromJson(Map<String, dynamic> json) {
+    final price = _formatNumber(json['nv']);
+    final previousClose = _formatNumber(json['pcv']);
+
+    final change = _calculateChange(
+      price: json['nv'],
+      previousClose: json['pcv'],
+    );
+
+    final changeRate = _formatChangeRate(
+      json['cr'],
+      price: json['nv'],
+      previousClose: json['pcv'],
+    );
+
+    final listedStockCount = _toDouble(json['countOfListedStock']);
+    final currentPrice = _toDouble(json['nv']);
+
+    final marketCap = currentPrice != null && listedStockCount != null
+        ? _formatMarketCap(currentPrice * listedStockCount)
+        : '';
+
     return StockPriceResult(
-      price: json['closePrice']?.toString() ?? '',
-      change: json['compareToPreviousClosePrice']?.toString() ?? '',
-      changeRate: _formatChangeRate(json['fluctuationsRatio']),
+      price: price,
+      change: change,
+      changeRate: changeRate,
+      openPrice: _formatNumber(json['ov']),
+      highPrice: _formatNumber(json['hv']),
+      lowPrice: _formatNumber(json['lv']),
+      tradingVolume: _formatVolume(json['aq']),
+      marketCap: marketCap,
     );
   }
 
-  static String _formatChangeRate(dynamic value) {
-    if (value == null) {
+  static String _calculateChange({
+    required dynamic price,
+    required dynamic previousClose,
+  }) {
+    final current = _toDouble(price);
+    final previous = _toDouble(previousClose);
+
+    if (current == null || previous == null) {
       return '';
     }
 
-    final text = value.toString().trim();
+    final change = current - previous;
 
-    if (text.isEmpty) {
+    if (change == 0) {
+      return '0';
+    }
+
+    return change > 0 ? '+${_formatNumber(change)}' : _formatNumber(change);
+  }
+
+  static String _formatChangeRate(
+    dynamic value, {
+    required dynamic price,
+    required dynamic previousClose,
+  }) {
+    final number = _toDouble(value);
+
+    if (number != null) {
+      return '${number >= 0 ? '+' : ''}${number.toStringAsFixed(2)}%';
+    }
+
+    final current = _toDouble(price);
+    final previous = _toDouble(previousClose);
+
+    if (current == null || previous == null || previous == 0) {
       return '';
     }
 
-    if (text.endsWith('%')) {
-      return text;
-    }
+    final calculated = ((current - previous) / previous) * 100;
 
-    final number = double.tryParse(text.replaceAll(',', ''));
+    return '${calculated >= 0 ? '+' : ''}${calculated.toStringAsFixed(2)}%';
+  }
+
+  static String _formatNumber(dynamic value) {
+    final number = _toDouble(value);
 
     if (number == null) {
-      return text;
+      return value?.toString() ?? '';
     }
 
-    return '${number >= 0 ? '+' : ''}${number.toStringAsFixed(2)}%';
+    return number.round().toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+  }
+
+  static String _formatVolume(dynamic value) {
+    final number = _toDouble(value);
+
+    if (number == null) {
+      return value?.toString() ?? '';
+    }
+
+    return number.round().toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+  }
+
+  static String _formatMarketCap(double value) {
+    if (value >= 1000000000000) {
+      return '${(value / 1000000000000).toStringAsFixed(0)}조';
+    }
+
+    if (value >= 100000000) {
+      return '${(value / 100000000).toStringAsFixed(0)}억';
+    }
+
+    return _formatNumber(value);
+  }
+
+  static double? _toDouble(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    return double.tryParse(value.toString().replaceAll(',', ''));
   }
 }
 

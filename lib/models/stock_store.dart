@@ -251,6 +251,12 @@ class StockStore extends ChangeNotifier {
         stock.price = priceResult.price;
         stock.change = priceResult.change;
         stock.changeRate = priceResult.changeRate;
+
+        stock.openPrice = priceResult.openPrice;
+        stock.highPrice = priceResult.highPrice;
+        stock.lowPrice = priceResult.lowPrice;
+        stock.tradingVolume = priceResult.tradingVolume;
+        stock.marketCap = priceResult.marketCap;
       } catch (e) {
         debugPrint(
           '검색 종목 시세 조회 실패 '

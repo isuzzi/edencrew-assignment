@@ -7,6 +7,7 @@ import '../widgets/search/search_empty_state.dart';
 import '../widgets/search/search_field.dart';
 import '../widgets/search/search_initial_state.dart';
 import '../widgets/search/search_result_list.dart';
+import 'stock_detail.screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final StockStore store;
@@ -131,6 +132,16 @@ class _SearchScreenState extends State<SearchScreen>
     setState(() {});
   }
 
+  /// 종목 상세 화면으로 이동
+  void _openStockDetail(Stock stock) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StockDetailScreen(store: widget.store, stock: stock),
+      ),
+    );
+  }
+
   /// 검색어 초기화
   void _clearSearch() {
     _controller.clear();
@@ -164,6 +175,7 @@ class _SearchScreenState extends State<SearchScreen>
                       stocks: _results,
                       searchQuery: _query,
                       onFavoriteTap: _toggleFavorite,
+                      onStockTap: _openStockDetail,
                     ),
             ),
           ],

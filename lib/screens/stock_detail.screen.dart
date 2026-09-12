@@ -74,8 +74,15 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-            const SliverToBoxAdapter(child: StockSummaryGrid()),
-
+            SliverToBoxAdapter(
+              child: StockSummaryGrid(
+                openPrice: stock.openPrice,
+                highPrice: stock.highPrice,
+                lowPrice: stock.lowPrice,
+                tradingVolume: stock.tradingVolume,
+                marketCap: stock.marketCap,
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
             const SliverToBoxAdapter(child: StockDailyPriceTable()),

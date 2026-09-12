@@ -5,6 +5,11 @@ class Stock {
   String price;
   String change;
   String changeRate;
+  String openPrice;
+  String highPrice;
+  String lowPrice;
+  String tradingVolume;
+  String marketCap;
 
   bool isFavorite;
 
@@ -16,6 +21,11 @@ class Stock {
     this.change = '',
     this.changeRate = '',
     this.isFavorite = false,
+    this.openPrice = '',
+    this.highPrice = '',
+    this.lowPrice = '',
+    this.tradingVolume = '',
+    this.marketCap = '',
   });
 
   Map<String, dynamic> toJson() {
