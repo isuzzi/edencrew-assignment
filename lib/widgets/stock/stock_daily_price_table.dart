@@ -1,44 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../../models/daily_price.dart';
 import '../../theme/theme.dart';
 
 class StockDailyPriceTable extends StatelessWidget {
-  const StockDailyPriceTable({super.key});
+  final List<DailyPrice> prices;
 
-  static const rows = [
-    _DailyPrice(
-      date: '03.27',
-      close: '179,700',
-      change: '-400',
-      volume: '29,113,466',
-      isDown: true,
-    ),
-    _DailyPrice(
-      date: '03.26',
-      close: '180,100',
-      change: '+1,200',
-      volume: '32,074,131',
-      isUp: true,
-    ),
-    _DailyPrice(
-      date: '03.25',
-      close: '178,900',
-      change: '+900',
-      volume: '27,441,209',
-      isUp: true,
-    ),
-    _DailyPrice(
-      date: '03.24',
-      close: '178,000',
-      change: '0',
-      volume: '31,882,540',
-    ),
-    _DailyPrice(
-      date: '03.23',
-      close: '178,000',
-      change: '0',
-      volume: '29,780,397',
-    ),
-  ];
+  const StockDailyPriceTable({super.key, required this.prices});
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +29,21 @@ class StockDailyPriceTable extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          ...rows.map((row) => _TableRow(data: row)),
+          if (prices.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  '일별 시세를 불러오지 못했습니다.',
+                  style: TextStyle(
+                    color: context.colors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...prices.map((price) => _TableRow(data: price)),
         ],
       ),
     );
@@ -122,21 +104,21 @@ class _TableHeader extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 10),
-        Divider(height: 1, thickness: 1, color: context.colors.borderSubtle),
+        const SizedBox(height: 10),
+        Divider(height: 1, thickness: 1),
       ],
     );
   }
 }
 
 class _TableRow extends StatelessWidget {
-  final _DailyPrice data;
+  final DailyPrice data;
 
   const _TableRow({required this.data});
 
   @override
   Widget build(BuildContext context) {
-    Color changeColor;
+    final Color changeColor;
 
     if (data.isUp) {
       changeColor = context.colors.chartLineUp;
@@ -156,7 +138,7 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              data.date,
+              data.displayDate,
               style: TextStyle(
                 color: context.colors.textSecondary,
                 fontSize: 11,
@@ -166,7 +148,7 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              data.close,
+              data.closePrice,
               textAlign: TextAlign.right,
               style: TextStyle(color: context.colors.textPrimary, fontSize: 11),
             ),
@@ -182,7 +164,7 @@ class _TableRow extends StatelessWidget {
           Expanded(
             flex: 3,
             child: Text(
-              data.volume,
+              data.tradingVolume,
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: context.colors.textSecondary,
@@ -194,22 +176,4 @@ class _TableRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DailyPrice {
-  final String date;
-  final String close;
-  final String change;
-  final String volume;
-  final bool isUp;
-  final bool isDown;
-
-  const _DailyPrice({
-    required this.date,
-    required this.close,
-    required this.change,
-    required this.volume,
-    this.isUp = false,
-    this.isDown = false,
-  });
 }

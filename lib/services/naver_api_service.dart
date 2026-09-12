@@ -1,15 +1,38 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:charset/charset.dart';
 
 import '../models/naver_search_result.dart';
+import '../models/daily_price.dart';
 
 class NaverApiService {
   static const String _autocompleteUrl = 'https://ac.stock.naver.com/ac';
+
   static const String _stockApiBaseUrl = 'https://m.stock.naver.com/api/stock';
+
   static const String _metadataApiBaseUrl =
       'https://stock.naver.com/api/securityFe/api/fchart/domestic/stock';
+
+  static const String _realtimeApiBaseUrl =
+      'https://polling.finance.naver.com/api/realtime';
+
+  static const String _dailyPriceApiUrl =
+      'https://finance.naver.com/item/sise_day.naver';
+
+  String _addComma(String value) {
+    final number = int.tryParse(value.replaceAll(',', ''));
+
+    if (number == null) {
+      return value;
+    }
+
+    return number.toString().replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+  }
 
   final http.Client _client;
 
@@ -41,9 +64,7 @@ class NaverApiService {
     return _parseSearchResults(decoded);
   }
 
-  static const String _realtimeApiBaseUrl =
-      'https://polling.finance.naver.com/api/realtime';
-
+  /// 실시간 시세 조회
   Future<StockPriceResult> getStockPrice(String symbol) async {
     final normalizedSymbol = symbol.trim();
 
@@ -64,31 +85,12 @@ class NaverApiService {
       );
     }
 
-    /*
-   * NAVER 실시간 시세 API는
-   * Content-Type: text/plain;charset=EUC-KR
-   * 로 응답한다.
-   *
-   * package:http의 response.body는 UTF-8 기준으로 처리될 수 있으므로
-   * bodyBytes를 EUC-KR로 직접 디코딩한다.
-   */
     final decoded = jsonDecode(eucKr.decode(response.bodyBytes));
 
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Naver 실시간 시세 API 응답 형식이 올바르지 않습니다.');
     }
 
-    /*
-   * 실제 NAVER 응답 구조:
-   *
-   * {
-   *   "resultCode": "success",
-   *   "result": {
-   *     "pollingInterval": 70000,
-   *     "areas": [...]
-   *   }
-   * }
-   */
     final result = decoded['result'];
 
     if (result is! Map<String, dynamic>) {
@@ -136,7 +138,7 @@ class NaverApiService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'Naver 실시간 시세 API 요청 실패 '
+        'Naver 메타데이터 API 요청 실패 '
         '($normalizedSymbol): ${response.statusCode}',
       );
     }
@@ -144,10 +146,324 @@ class NaverApiService {
     final decoded = jsonDecode(response.body);
 
     if (decoded is! Map<String, dynamic>) {
-      throw Exception('Naver 실시간 시세 API 응답 형식이 올바르지 않습니다.');
+      throw Exception('Naver 메타데이터 API 응답 형식이 올바르지 않습니다.');
     }
 
     return StockMetadataResult.fromJson(decoded);
+  }
+
+  /// 일별 시세 조회
+  ///
+  /// Naver finance의 sise_day.naver는 JSON이 아니라
+  /// HTML을 반환한다.
+  Future<DailyPricePageResult> getDailyPrices(String symbol, int page) async {
+    final normalizedSymbol = symbol.trim();
+
+    if (!RegExp(r'^\d{6}$').hasMatch(normalizedSymbol)) {
+      throw ArgumentError('잘못된 종목 코드입니다: $symbol');
+    }
+
+    if (page < 1) {
+      throw ArgumentError('페이지는 1 이상이어야 합니다: $page');
+    }
+
+    final uri = Uri.parse(_dailyPriceApiUrl).replace(
+      queryParameters: {'code': normalizedSymbol, 'page': page.toString()},
+    );
+
+    final response = await _client.get(
+      uri,
+      headers: {'User-Agent': 'Mozilla/5.0'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Naver 일별 시세 API 요청 실패 '
+        '($normalizedSymbol, page=$page): '
+        '${response.statusCode}',
+      );
+    }
+
+    /*
+     * sise_day.naver는 UTF-8이 아닌 EUC-KR 계열의
+     * HTML 응답을 반환한다.
+     *
+     * response.body를 바로 사용하지 않고
+     * bodyBytes를 EUC-KR로 직접 디코딩한다.
+     */
+    final html = eucKr.decode(response.bodyBytes);
+
+    final prices = _parseDailyPrices(html);
+
+    final lastPage = _parseLastPage(html);
+
+    if (prices.isEmpty) {
+      throw Exception(
+        'Naver 일별 시세 데이터가 없습니다. '
+        '($normalizedSymbol, page=$page)',
+      );
+    }
+
+    debugPrint(
+      '일별 시세 조회: '
+      '$normalizedSymbol / '
+      'page=$page / '
+      '${prices.length}개 / '
+      'lastPage=$lastPage',
+    );
+
+    return DailyPricePageResult(prices: prices, lastPage: lastPage);
+  }
+
+  /// 일별 시세 HTML 파싱
+  List<DailyPrice> _parseDailyPrices(String html) {
+    final prices = <DailyPrice>[];
+
+    /*
+     * 네이버 일별 시세 표의 각 행을 찾는다.
+     */
+    final rowMatches = RegExp(
+      r'<tr[^>]*>(.*?)</tr>',
+      caseSensitive: false,
+      dotAll: true,
+    ).allMatches(html);
+
+    for (final rowMatch in rowMatches) {
+      final rowHtml = rowMatch.group(1) ?? '';
+
+      /*
+       * td HTML 원본을 먼저 가져온다.
+       *
+       * 기존 코드처럼 바로 cleanHtmlText()를 적용하면
+       * 전일비의 상승/하락 정보를 가지고 있는 img 태그까지
+       * 제거되어 방향 정보를 잃을 수 있다.
+       */
+      final rawCells = RegExp(
+        r'<td[^>]*>(.*?)</td>',
+        caseSensitive: false,
+        dotAll: true,
+      ).allMatches(rowHtml).map((match) => match.group(1) ?? '').toList();
+
+      /*
+       * 날짜 / 종가 / 전일비 / 시가 / 고가 / 저가 / 거래량
+       *
+       * 실제 데이터 행은 최소 7개의 td를 가진다.
+       */
+      if (rawCells.length < 7) {
+        continue;
+      }
+
+      /*
+       * 날짜
+       */
+      final date = _normalizeDate(_cleanHtmlText(rawCells[0]));
+
+      /*
+       * 날짜가 아닌 행은 헤더/불필요한 행이므로 제외
+       */
+      if (date.isEmpty) {
+        continue;
+      }
+
+      /*
+       * 종가
+       */
+      final closePrice = _normalizeNumber(_cleanHtmlText(rawCells[1]));
+
+      /*
+       * 전일비
+       *
+       * 중요:
+       * 여기서는 cleanHtmlText() 결과가 아니라
+       * HTML 원본을 넘긴다.
+       *
+       * 상승/하락 방향을 img alt 및 텍스트에서
+       * 직접 판단한다.
+       */
+      final change = _parseChangeCell(rawCells[2]);
+
+      /*
+       * 시가
+       */
+      final openPrice = _normalizeNumber(_cleanHtmlText(rawCells[3]));
+
+      /*
+       * 고가
+       */
+      final highPrice = _normalizeNumber(_cleanHtmlText(rawCells[4]));
+
+      /*
+       * 저가
+       */
+      final lowPrice = _normalizeNumber(_cleanHtmlText(rawCells[5]));
+
+      /*
+       * 거래량
+       */
+      final tradingVolume = _normalizeNumber(_cleanHtmlText(rawCells[6]));
+
+      /*
+       * 필수 숫자 데이터가 없는 행은 제외
+       */
+      if (closePrice.isEmpty ||
+          openPrice.isEmpty ||
+          highPrice.isEmpty ||
+          lowPrice.isEmpty ||
+          tradingVolume.isEmpty) {
+        continue;
+      }
+
+      prices.add(
+        DailyPrice(
+          date: date,
+          closePrice: _addComma(closePrice),
+          change: change,
+          openPrice: _addComma(openPrice),
+          highPrice: _addComma(highPrice),
+          lowPrice: _addComma(lowPrice),
+          tradingVolume: _addComma(tradingVolume),
+        ),
+      );
+    }
+
+    return prices;
+  }
+
+  /// 일별 시세의 전일비 HTML 파싱
+  String _parseChangeCell(String html) {
+    // 네이버 금융은 전일비 방향을 class로 표현한다.
+    //
+    // bu_pup = 상승
+    // bu_pdn = 하락
+    // bu_pn  = 보합
+
+    String direction = '';
+
+    if (html.contains('bu_pup')) {
+      direction = '+';
+    } else if (html.contains('bu_pdn')) {
+      direction = '-';
+    } else if (html.contains('bu_pn')) {
+      direction = '0';
+    }
+
+    // 전일비 숫자 추출
+    final text = _cleanHtmlText(html);
+
+    final numberMatch = RegExp(r'\d[\d,]*').firstMatch(text);
+
+    if (numberMatch == null) {
+      return '0';
+    }
+
+    final number = int.tryParse(numberMatch.group(0)!.replaceAll(',', ''));
+
+    if (number == null || number == 0) {
+      return '0';
+    }
+
+    final formattedNumber = _addComma(number.abs().toString());
+
+    if (direction == '+') {
+      return '+$formattedNumber';
+    }
+
+    if (direction == '-') {
+      return '-$formattedNumber';
+    }
+
+    if (direction == '0') {
+      return '0';
+    }
+
+    // 방향을 찾지 못한 경우
+    debugPrint('전일비 방향을 확인하지 못했습니다: $html');
+
+    return formattedNumber;
+  }
+
+  /// 마지막 페이지 번호 추출
+  int _parseLastPage(String html) {
+    final pageNavigationMatch = RegExp(
+      r'<td[^>]*pgRR[^>]*>(.*?)</td>',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(html);
+
+    if (pageNavigationMatch == null) {
+      return 1;
+    }
+
+    final navigationHtml = pageNavigationMatch.group(1) ?? '';
+
+    final pageNumbers = RegExp(
+      r'(?:[?&]|&amp;)page=(\d+)',
+      caseSensitive: false,
+    ).allMatches(navigationHtml);
+
+    var lastPage = 1;
+
+    for (final match in pageNumbers) {
+      final page = int.tryParse(match.group(1) ?? '');
+
+      if (page != null && page > lastPage) {
+        lastPage = page;
+      }
+    }
+
+    return lastPage;
+  }
+
+  /// HTML 태그 및 공백 제거
+  String _cleanHtmlText(String value) {
+    var text = value;
+
+    text = text.replaceAll(RegExp(r'<[^>]+>'), '');
+
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>');
+
+    return text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  /// 날짜를 yyyyMMdd로 정규화
+  String _normalizeDate(String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length != 8) {
+      return '';
+    }
+
+    return digits;
+  }
+
+  /// 숫자 문자열 정리
+  String _normalizeNumber(String value) {
+    return value.replaceAll(',', '').trim();
+  }
+
+  /// 전일비 부호 정리
+  ///
+  /// 기존 코드와의 호환성을 위해 유지한다.
+  String _normalizeChange(String value) {
+    final normalized = value
+        .replaceAll(',', '')
+        .replaceAll('▲', '+')
+        .replaceAll('▼', '-')
+        .trim();
+
+    if (normalized.isEmpty || normalized == '0') {
+      return '0';
+    }
+
+    if (normalized.startsWith('+') || normalized.startsWith('-')) {
+      return normalized;
+    }
+
+    return normalized;
   }
 
   List<NaverSearchResult> _parseSearchResults(dynamic data) {
@@ -169,14 +485,13 @@ class NaverApiService {
       }
 
       final code = item['code']?.toString() ?? '';
+
       final nationCode = item['nationCode']?.toString() ?? '';
 
-      // 국내 주식만 허용
       if (nationCode != 'KOR') {
         continue;
       }
 
-      // 6자리 종목코드만 허용
       if (!RegExp(r'^\d{6}$').hasMatch(code)) {
         continue;
       }
@@ -190,6 +505,14 @@ class NaverApiService {
   void dispose() {
     _client.close();
   }
+}
+
+/// 일별 시세 페이지 조회 결과
+class DailyPricePageResult {
+  final List<DailyPrice> prices;
+  final int lastPage;
+
+  const DailyPricePageResult({required this.prices, required this.lastPage});
 }
 
 /// NAVER 종목 시세 응답
@@ -217,7 +540,6 @@ class StockPriceResult {
 
   factory StockPriceResult.fromJson(Map<String, dynamic> json) {
     final price = _formatNumber(json['nv']);
-    final previousClose = _formatNumber(json['pcv']);
 
     final change = _calculateChange(
       price: json['nv'],
@@ -231,6 +553,7 @@ class StockPriceResult {
     );
 
     final listedStockCount = _toDouble(json['countOfListedStock']);
+
     final currentPrice = _toDouble(json['nv']);
 
     final marketCap = currentPrice != null && listedStockCount != null
@@ -277,7 +600,8 @@ class StockPriceResult {
     final number = _toDouble(value);
 
     if (number != null) {
-      return '${number >= 0 ? '+' : ''}${number.toStringAsFixed(2)}%';
+      return '${number >= 0 ? '+' : ''}'
+          '${number.toStringAsFixed(2)}%';
     }
 
     final current = _toDouble(price);
@@ -289,7 +613,8 @@ class StockPriceResult {
 
     final calculated = ((current - previous) / previous) * 100;
 
-    return '${calculated >= 0 ? '+' : ''}${calculated.toStringAsFixed(2)}%';
+    return '${calculated >= 0 ? '+' : ''}'
+        '${calculated.toStringAsFixed(2)}%';
   }
 
   static String _formatNumber(dynamic value) {

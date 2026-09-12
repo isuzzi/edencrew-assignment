@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'stock.dart';
 import 'naver_search_result.dart';
+import 'daily_price.dart';
 import '../services/naver_api_service.dart';
 
 class StockStore extends ChangeNotifier {
@@ -63,11 +64,28 @@ class StockStore extends ChangeNotifier {
   List<Stock> get favoriteStocks =>
       stocks.where((stock) => stock.isFavorite).toList();
 
-  /// 앱 시작 시 로컬 관심 종목을 불러온다.
+  /*
+   * 종목별 페이지 캐시
+   *
+   * {
+   *   '005930': {
+   *      1: [DailyPrice, ...],
+   *      2: [DailyPrice, ...],
+   *   }
+   * }
+   */
+  final Map<String, Map<int, List<DailyPrice>>> _dailyPriceCache = {};
+
+  /*
+   * 종목별 마지막 페이지
+   *
+   * 네이버 응답의 lastPage를 저장한다.
+   */
+  final Map<String, int> _dailyPriceLastPage = {};
+
+  /// 앱 시작
   Future<void> _initialize() async {
     await _loadFavorites();
-
-    // 로컬에서 복원한 관심 종목의 최신 시세를 가져온다.
     await _refreshFavorites();
 
     notifyListeners();
@@ -75,21 +93,18 @@ class StockStore extends ChangeNotifier {
 
   /// 관심 종목 추가 / 삭제
   void toggleFavorite(Stock stock) {
-    // 검색 결과로 새롭게 생성된 Stock이라면
-    // 관심 목록에서 사용할 수 있도록 stocks에 추가한다.
     if (!stocks.contains(stock)) {
       stocks.add(stock);
     }
 
     stock.isFavorite = !stock.isFavorite;
 
-    // 관심 목록이 변경될 때마다 로컬에 저장한다.
     _saveFavorites();
 
     notifyListeners();
   }
 
-  /// 관심 종목을 로컬에 저장한다.
+  /// 관심 종목 저장
   Future<void> _saveFavorites() async {
     try {
       final preferences = await SharedPreferences.getInstance();
@@ -100,13 +115,16 @@ class StockStore extends ChangeNotifier {
 
       await preferences.setString(_favoritesKey, jsonEncode(favoriteData));
 
-      debugPrint('관심 종목 저장 완료: ${favoriteStocks.length}개');
+      debugPrint(
+        '관심 종목 저장 완료: '
+        '${favoriteStocks.length}개',
+      );
     } catch (e) {
       debugPrint('관심 종목 저장 실패: $e');
     }
   }
 
-  /// 로컬에 저장된 관심 종목을 불러온다.
+  /// 관심 종목 복원
   Future<void> _loadFavorites() async {
     try {
       final preferences = await SharedPreferences.getInstance();
@@ -123,8 +141,6 @@ class StockStore extends ChangeNotifier {
       for (final item in decodedData) {
         final savedStock = Stock.fromJson(Map<String, dynamic>.from(item));
 
-        // 기본 stocks에 이미 존재하는 종목이라면
-        // 기존 Stock 객체를 사용한다.
         Stock? existingStock;
 
         for (final stock in stocks) {
@@ -137,14 +153,15 @@ class StockStore extends ChangeNotifier {
         if (existingStock != null) {
           existingStock.isFavorite = true;
         } else {
-          // 검색을 통해 새롭게 추가했던 종목이라면
-          // 로컬 데이터로 Stock을 새로 생성한다.
           savedStock.isFavorite = true;
           stocks.add(savedStock);
         }
       }
 
-      debugPrint('관심 종목 복원 완료: ${favoriteStocks.length}개');
+      debugPrint(
+        '관심 종목 복원 완료: '
+        '${favoriteStocks.length}개',
+      );
 
       notifyListeners();
     } catch (e) {
@@ -168,7 +185,6 @@ class StockStore extends ChangeNotifier {
     }
 
     for (final stock in favorites) {
-      // 메타데이터 API
       try {
         final metadataResult = await _apiService.getStockMetadata(stock.symbol);
 
@@ -188,7 +204,6 @@ class StockStore extends ChangeNotifier {
         );
       }
 
-      // 시세 API
       try {
         final priceResult = await _apiService.getStockPrice(stock.symbol);
 
@@ -276,19 +291,139 @@ class StockStore extends ChangeNotifier {
     return searchStocks;
   }
 
-  /// API 검색 결과를 앱의 Stock 모델로 변환
+  /// 기간에 필요한 일별 시세 조회
+  Future<List<DailyPrice>> getDailyPricesForPeriod(
+    String symbol,
+    String period,
+  ) async {
+    final requiredPages = _requiredPages(period);
+
+    final cachedPages = _dailyPriceCache[symbol] ??= {};
+
+    var lastPage = _dailyPriceLastPage[symbol];
+
+    /*
+     * 필요한 페이지까지만 요청한다.
+     *
+     * 이미 캐시된 페이지는 절대 다시 요청하지 않는다.
+     */
+    for (var page = 1; page <= requiredPages; page++) {
+      if (cachedPages.containsKey(page)) {
+        continue;
+      }
+
+      /*
+       * 이미 확인한 lastPage보다 큰 페이지라면
+       * 더 이상 요청하지 않는다.
+       */
+      if (lastPage != null && page > lastPage) {
+        break;
+      }
+
+      try {
+        final result = await _apiService.getDailyPrices(symbol, page);
+
+        cachedPages[page] = result.prices;
+
+        lastPage = result.lastPage;
+
+        _dailyPriceLastPage[symbol] = result.lastPage;
+
+        debugPrint(
+          '일별 시세 캐시 저장: '
+          '$symbol / page=$page',
+        );
+
+        /*
+         * 현재 페이지 자체가 마지막 페이지라면
+         * 이후 페이지는 요청할 필요가 없다.
+         */
+        if (page >= result.lastPage) {
+          break;
+        }
+      } catch (e) {
+        debugPrint(
+          '일별 시세 조회 실패: '
+          '$symbol / page=$page / $e',
+        );
+
+        rethrow;
+      }
+    }
+
+    final prices = <DailyPrice>[];
+
+    for (var page = 1; page <= requiredPages; page++) {
+      final pagePrices = cachedPages[page];
+
+      if (pagePrices == null) {
+        continue;
+      }
+
+      prices.addAll(pagePrices);
+    }
+
+    /*
+     * 네이버 데이터는 최신 날짜부터 내려오므로
+     * 필요한 기간만큼 잘라낸다.
+     */
+    return prices.take(_requiredTradingDays(period)).toList();
+  }
+
+  /// 기간별 필요한 페이지 수
+  int _requiredPages(String period) {
+    switch (period) {
+      case '1개월':
+        return 2;
+
+      case '3개월':
+        return 6;
+
+      case '6개월':
+        return 12;
+
+      case '1년':
+        return 25;
+
+      default:
+        return 2;
+    }
+  }
+
+  /// 기간별 필요한 거래일 수
+  int _requiredTradingDays(String period) {
+    switch (period) {
+      case '1개월':
+        return 20;
+
+      case '3개월':
+        return 60;
+
+      case '6개월':
+        return 120;
+
+      case '1년':
+        return 245;
+
+      default:
+        return 20;
+    }
+  }
+
+  /// 특정 종목의 일별 시세 캐시 초기화
+  void clearDailyPriceCache(String symbol) {
+    _dailyPriceCache.remove(symbol);
+    _dailyPriceLastPage.remove(symbol);
+  }
+
+  /// 검색 결과 → Stock
   Stock _toStock(NaverSearchResult result) {
-    // 이미 Store에 존재하는 종목이라면
-    // 기존 Stock 객체를 그대로 사용한다.
-    //
-    // 이렇게 해야 기존 isFavorite 상태가 유지된다.
     for (final stock in stocks) {
       if (stock.symbol == result.symbol) {
         return stock;
       }
     }
 
-    // 처음 검색된 종목은 새로운 Stock 객체를 만든다.
     return Stock(
       name: result.name,
       symbol: result.symbol,
@@ -296,7 +431,7 @@ class StockStore extends ChangeNotifier {
     );
   }
 
-  /// Naver API의 시장 정보를 앱에서 사용하는 시장명으로 변환
+  /// 시장명 변환
   String _marketName(NaverSearchResult result) {
     if (result.typeName.contains('코스닥')) {
       return '코스닥';
