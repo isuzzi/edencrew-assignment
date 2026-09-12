@@ -212,6 +212,31 @@ class NaverApiService {
       'lastPage=$lastPage',
     );
 
+    debugPrint('===== 일별 시세 실제 데이터 =====');
+    debugPrint(
+      '종목코드: $normalizedSymbol / '
+      '페이지: $page / '
+      '데이터: ${prices.length}개 / '
+      '마지막 페이지: $lastPage',
+    );
+
+    for (var i = 0; i < prices.length; i++) {
+      final price = prices[i];
+
+      debugPrint(
+        '[${i + 1}] '
+        '날짜=${price.date} '
+        '종가=${price.closePrice} '
+        '전일비=${price.change} '
+        '시가=${price.openPrice} '
+        '고가=${price.highPrice} '
+        '저가=${price.lowPrice} '
+        '거래량=${price.tradingVolume}',
+      );
+    }
+
+    debugPrint('==============================');
+
     return DailyPricePageResult(prices: prices, lastPage: lastPage);
   }
 
