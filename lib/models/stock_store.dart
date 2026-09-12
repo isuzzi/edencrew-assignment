@@ -196,6 +196,12 @@ class StockStore extends ChangeNotifier {
         stock.change = priceResult.change;
         stock.changeRate = priceResult.changeRate;
 
+        stock.openPrice = priceResult.openPrice;
+        stock.highPrice = priceResult.highPrice;
+        stock.lowPrice = priceResult.lowPrice;
+        stock.tradingVolume = priceResult.tradingVolume;
+        stock.marketCap = priceResult.marketCap;
+
         debugPrint(
           '시세 업데이트: '
           '${stock.name}(${stock.symbol}) '
