@@ -57,6 +57,19 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       if (!mounted) {
         return;
       }
+      debugPrint(
+        '일별 시세 로드 완료: '
+        '${widget.stock.name}(${widget.stock.symbol}) '
+        '/ 기간=$period '
+        '/ 데이터=${prices.length}개',
+      );
+
+      if (prices.isNotEmpty) {
+        debugPrint(
+          '일별 시세 범위: '
+          '${prices.last.date} ~ ${prices.first.date}',
+        );
+      }
 
       setState(() {
         dailyPrices = prices;
@@ -126,7 +139,12 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
               ),
             ),
 
-            SliverToBoxAdapter(child: StockPriceChart(period: selectedPeriod)),
+            SliverToBoxAdapter(
+              child: StockPriceChart(
+                period: selectedPeriod,
+                prices: dailyPrices,
+              ),
+            ),
 
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
