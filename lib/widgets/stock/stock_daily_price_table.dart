@@ -27,8 +27,6 @@ class StockDailyPriceTable extends StatelessWidget {
 
           const _TableHeader(),
 
-          const SizedBox(height: 8),
-
           if (prices.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
@@ -105,7 +103,7 @@ class _TableHeader extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        Divider(height: 1, thickness: 1),
+        Divider(height: 1, thickness: 1, color: context.colors.borderSubtle),
       ],
     );
   }
