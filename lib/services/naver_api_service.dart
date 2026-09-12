@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/naver_search_result.dart';
@@ -7,6 +7,8 @@ import '../models/naver_search_result.dart';
 class NaverApiService {
   static const String _autocompleteUrl = 'https://ac.stock.naver.com/ac';
   static const String _stockApiBaseUrl = 'https://m.stock.naver.com/api/stock';
+  static const String _metadataApiBaseUrl =
+      'https://stock.naver.com/api/securityFe/api/fchart/domestic/stock';
 
   final http.Client _client;
 
@@ -64,6 +66,34 @@ class NaverApiService {
     }
 
     return StockPriceResult.fromJson(decoded);
+  }
+
+  /// 종목 메타데이터 조회
+  Future<StockMetadataResult> getStockMetadata(String symbol) async {
+    final normalizedSymbol = symbol.trim();
+
+    if (!RegExp(r'^\d{6}$').hasMatch(normalizedSymbol)) {
+      throw ArgumentError('잘못된 종목 코드입니다: $symbol');
+    }
+
+    final uri = Uri.parse('$_metadataApiBaseUrl/$normalizedSymbol');
+
+    final response = await _client.get(uri);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Naver 종목 메타데이터 API 요청 실패 '
+        '($normalizedSymbol): ${response.statusCode}',
+      );
+    }
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+    if (decoded is! Map<String, dynamic>) {
+      throw Exception('Naver 종목 메타데이터 API 응답 형식이 올바르지 않습니다.');
+    }
+
+    return StockMetadataResult.fromJson(decoded);
   }
 
   List<NaverSearchResult> _parseSearchResults(dynamic data) {
@@ -150,5 +180,26 @@ class StockPriceResult {
     }
 
     return '${number >= 0 ? '+' : ''}${number.toStringAsFixed(2)}%';
+  }
+}
+
+/// NAVER 종목 메타데이터 응답
+class StockMetadataResult {
+  final String symbol;
+  final String name;
+  final String exchangeName;
+
+  const StockMetadataResult({
+    required this.symbol,
+    required this.name,
+    required this.exchangeName,
+  });
+
+  factory StockMetadataResult.fromJson(Map<String, dynamic> json) {
+    return StockMetadataResult(
+      symbol: json['symbolCode']?.toString() ?? '',
+      name: json['stockName']?.toString() ?? '',
+      exchangeName: json['stockExchangeNameKor']?.toString() ?? '',
+    );
   }
 }

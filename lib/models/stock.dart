@@ -1,7 +1,7 @@
 class Stock {
-  final String name;
+  String name;
   final String symbol;
-  final String market;
+  String market;
   String price;
   String change;
   String changeRate;

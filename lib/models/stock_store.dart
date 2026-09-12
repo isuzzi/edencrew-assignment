@@ -159,7 +159,7 @@ class StockStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 실제 관심 종목 시세 업데이트
+  /// 실제 관심 종목 시세 및 메타데이터 업데이트
   Future<void> _refreshFavorites() async {
     final favorites = favoriteStocks;
 
@@ -168,6 +168,27 @@ class StockStore extends ChangeNotifier {
     }
 
     for (final stock in favorites) {
+      // 메타데이터 API
+      try {
+        final metadataResult = await _apiService.getStockMetadata(stock.symbol);
+
+        stock.name = metadataResult.name;
+        stock.market = metadataResult.exchangeName;
+
+        debugPrint(
+          '관심 종목 메타데이터 적용: '
+          '${stock.symbol} / '
+          '${stock.name} / '
+          '${stock.market}',
+        );
+      } catch (e) {
+        debugPrint(
+          '관심 종목 메타데이터 조회 실패 '
+          '${stock.symbol}: $e',
+        );
+      }
+
+      // 시세 API
       try {
         final priceResult = await _apiService.getStockPrice(stock.symbol);
 
@@ -204,6 +225,25 @@ class StockStore extends ChangeNotifier {
 
     for (final result in results) {
       final stock = _toStock(result);
+
+      try {
+        final metadataResult = await _apiService.getStockMetadata(stock.symbol);
+
+        stock.name = metadataResult.name;
+        stock.market = metadataResult.exchangeName;
+
+        debugPrint(
+          '메타데이터 적용: '
+          '${stock.symbol} / '
+          '${stock.name} / '
+          '${stock.market}',
+        );
+      } catch (e) {
+        debugPrint(
+          '메타데이터 조회 실패 '
+          '${stock.symbol}: $e',
+        );
+      }
 
       try {
         final priceResult = await _apiService.getStockPrice(stock.symbol);
