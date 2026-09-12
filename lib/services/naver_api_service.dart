@@ -59,7 +59,7 @@ class NaverApiService {
       throw Exception('Naver 검색 API 요청 실패: ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(eucKr.decode(response.bodyBytes));
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
     return _parseSearchResults(decoded);
   }
