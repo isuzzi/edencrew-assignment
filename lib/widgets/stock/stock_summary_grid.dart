@@ -2,7 +2,20 @@ import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
 
 class StockSummaryGrid extends StatelessWidget {
-  const StockSummaryGrid({super.key});
+  final String openPrice;
+  final String highPrice;
+  final String lowPrice;
+  final String tradingVolume;
+  final String marketCap;
+
+  const StockSummaryGrid({
+    super.key,
+    required this.openPrice,
+    required this.highPrice,
+    required this.lowPrice,
+    required this.tradingVolume,
+    required this.marketCap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -12,19 +25,19 @@ class StockSummaryGrid extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: _SummaryItem('시가', '172,100')),
+              Expanded(child: _SummaryItem('시가', openPrice)),
               const SizedBox(width: 8),
-              Expanded(child: _SummaryItem('고가', '181,700')),
+              Expanded(child: _SummaryItem('고가', highPrice)),
               const SizedBox(width: 8),
-              Expanded(child: _SummaryItem('저가', '172,000')),
+              Expanded(child: _SummaryItem('저가', lowPrice)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(flex: 2, child: _SummaryItem('거래량', '29,113천')),
+              Expanded(flex: 2, child: _SummaryItem('거래량', tradingVolume)),
               const SizedBox(width: 8),
-              Expanded(flex: 2, child: _SummaryItem('시가총액', '1,063조')),
+              Expanded(flex: 2, child: _SummaryItem('시가총액', marketCap)),
             ],
           ),
         ],

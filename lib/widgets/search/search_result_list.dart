@@ -8,12 +8,14 @@ class SearchResultList extends StatelessWidget {
   final List<Stock> stocks;
   final String searchQuery;
   final void Function(Stock stock)? onFavoriteTap;
+  final void Function(Stock stock)? onStockTap;
 
   const SearchResultList({
     super.key,
     required this.stocks,
     required this.searchQuery,
     this.onFavoriteTap,
+    this.onStockTap,
   });
 
   @override
@@ -29,6 +31,9 @@ class SearchResultList extends StatelessWidget {
         return StockListTile(
           stock: stock,
           searchQuery: searchQuery,
+          onTap: () {
+            onStockTap?.call(stock);
+          },
           onFavoriteTap: () {
             onFavoriteTap?.call(stock);
           },

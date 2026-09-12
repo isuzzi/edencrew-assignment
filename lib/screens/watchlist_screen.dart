@@ -6,6 +6,7 @@ import '../widgets/stock/stock_list_tile.dart';
 import '../widgets/watchlist/watchlist_header.dart';
 import '../widgets/watchlist/empty_watchlist.dart';
 import '../widgets/watchlist/sort_bottom_sheet.dart';
+import '../screens/stock_detail.screen.dart';
 
 class WatchlistScreen extends StatefulWidget {
   final StockStore store;
@@ -83,6 +84,16 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
     return double.tryParse(value) ?? 0;
   }
 
+  /// 종목 상세 화면으로 이동
+  void _openStockDetail(Stock stock) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StockDetailScreen(store: widget.store, stock: stock),
+      ),
+    );
+  }
+
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
@@ -110,13 +121,24 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
         bottom: false,
         child: Column(
           children: [
-            WatchlistHeader(sortType: _sortType, onSortTap: _showSortSheet),
+            WatchlistHeader(
+              sortType: _sortType,
+              onSortTap: _showSortSheet,
+              onRefreshTap: () async {
+                debugPrint('관심 목록 새로고침 시작');
 
+                await widget.store.refreshFavorites();
+
+                debugPrint('관심 목록 새로고침 완료');
+              },
+            ),
             Expanded(
               child: stocks.isEmpty
                   ? const EmptyWatchlist()
                   : RefreshIndicator(
                       onRefresh: () async {
+                        debugPrint('관심 목록 새로고침 시작');
+
                         await widget.store.refreshFavorites();
                       },
                       child: ListView.builder(
@@ -127,6 +149,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
 
                           return StockListTile(
                             stock: stock,
+                            onTap: () {
+                              _openStockDetail(stock);
+                            },
                             onFavoriteTap: () {
                               widget.store.toggleFavorite(stock);
                             },

@@ -4,11 +4,13 @@ import '../../theme/app_theme.dart';
 class WatchlistHeader extends StatelessWidget {
   final String sortType;
   final VoidCallback onSortTap;
+  final VoidCallback onRefreshTap;
 
   const WatchlistHeader({
     super.key,
     required this.sortType,
     required this.onSortTap,
+    required this.onRefreshTap,
   });
 
   @override
@@ -38,7 +40,6 @@ class WatchlistHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 4),
-
                   Icon(
                     Icons.arrow_downward,
                     size: 18,
@@ -51,6 +52,7 @@ class WatchlistHeader extends StatelessWidget {
             const SizedBox(width: 16),
 
             GestureDetector(
+              onTap: onRefreshTap,
               child: Icon(
                 Icons.refresh,
                 size: 20,
