@@ -16,7 +16,6 @@ Flutter와 Figma 디자인을 기반으로 주식 관심종목, 종목 검색, �
 - Dart SDK `^3.11.5`
 - macOS
 - iOS Simulator
-- Chrome
 
 ### 실행
 
