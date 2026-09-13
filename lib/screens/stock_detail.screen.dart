@@ -57,6 +57,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       if (!mounted) {
         return;
       }
+
       debugPrint(
         '일별 시세 로드 완료: '
         '${widget.stock.name}(${widget.stock.symbol}) '
@@ -110,6 +111,11 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 market: stock.market,
                 onBackTap: () => Navigator.of(context).pop(),
                 isFavorite: stock.isFavorite,
+                onFavoriteTap: () {
+                  widget.store.toggleFavorite(stock);
+
+                  setState(() {});
+                },
               ),
             ),
 
@@ -130,11 +136,6 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                   });
 
                   _loadDailyPrices(period);
-                },
-                onFavoriteTap: () {
-                  widget.store.toggleFavorite(stock);
-
-                  setState(() {});
                 },
               ),
             ),

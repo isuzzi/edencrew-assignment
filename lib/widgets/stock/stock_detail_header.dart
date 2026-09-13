@@ -7,6 +7,7 @@ class StockDetailHeader extends StatelessWidget {
   final String market;
   final bool isFavorite;
   final VoidCallback onBackTap;
+  final VoidCallback onFavoriteTap;
 
   const StockDetailHeader({
     super.key,
@@ -15,6 +16,7 @@ class StockDetailHeader extends StatelessWidget {
     required this.market,
     required this.isFavorite,
     required this.onBackTap,
+    required this.onFavoriteTap,
   });
 
   @override
@@ -63,6 +65,7 @@ class StockDetailHeader extends StatelessWidget {
             ),
           ),
           GestureDetector(
+            onTap: onFavoriteTap,
             child: Icon(
               isFavorite ? Icons.star : Icons.star_border,
               size: 24,

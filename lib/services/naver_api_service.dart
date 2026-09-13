@@ -59,7 +59,7 @@ class NaverApiService {
       throw Exception('Naver 검색 API 요청 실패: ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(eucKr.decode(response.bodyBytes));
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
     return _parseSearchResults(decoded);
   }
@@ -572,7 +572,6 @@ class StockPriceResult {
     );
 
     final changeRate = _formatChangeRate(
-      json['cr'],
       price: json['nv'],
       previousClose: json['pcv'],
     );
@@ -617,18 +616,10 @@ class StockPriceResult {
     return change > 0 ? '+${_formatNumber(change)}' : _formatNumber(change);
   }
 
-  static String _formatChangeRate(
-    dynamic value, {
+  static String _formatChangeRate({
     required dynamic price,
     required dynamic previousClose,
   }) {
-    final number = _toDouble(value);
-
-    if (number != null) {
-      return '${number >= 0 ? '+' : ''}'
-          '${number.toStringAsFixed(2)}%';
-    }
-
     final current = _toDouble(price);
     final previous = _toDouble(previousClose);
 
@@ -638,8 +629,13 @@ class StockPriceResult {
 
     final calculated = ((current - previous) / previous) * 100;
 
-    return '${calculated >= 0 ? '+' : ''}'
-        '${calculated.toStringAsFixed(2)}%';
+    if (calculated == 0) {
+      return '0.00%';
+    }
+
+    return calculated > 0
+        ? '+${calculated.toStringAsFixed(2)}%'
+        : '${calculated.toStringAsFixed(2)}%';
   }
 
   static String _formatNumber(dynamic value) {
